@@ -1,73 +1,91 @@
 # 📱 Citonova Task App
 
-Aplicación móvil desarrollada con React Native y Expo para la gestión de tareas de Citonova.
+Aplicación móvil desarrollada con React Native y Expo para la gestión de tareas de Citonova, integrada con una API REST para la persistencia de datos y autenticación.
 
 ## 🛠️ Tecnologías Utilizadas
 
 *   ⚛️ **Framework**: React Native (via Expo)
 *   📘 **Lenguaje**: TypeScript
 *   🧭 **Navegación**: Expo Router
-*   💾 **Persistencia de Datos**: AsyncStorage (Almacenamiento local en el dispositivo)
-*   📸 **Manejo de Imágenes**: Expo Image Picker
-*   🎨 **Iconos**: Expo Vector Icons (FontAwesome)
+*   🌐 **API REST**: Integración con backend para gestión de datos.
+*   💾 **Persistencia Local**: AsyncStorage (para tokens de sesión).
+*   📍 **Geolocalización**: Expo Location (para capturar ubicación de tareas).
+*   📸 **Manejo de Imágenes**: Expo Image Picker (visualización de imágenes remotas).
+*   🎨 **Iconos**: Expo Vector Icons (FontAwesome).
 
 ## 🚀 Funcionamiento y Características
 
-### 1. 🔐 Autenticación y Perfiles
-*   **Login Seguro**: Acceso mediante correo y contraseña.
-*   **Roles de Usuario**:
-    *   👑 **Superadmin**: Acceso total, gestión de usuarios y visualización de todos los perfiles.
-    *   🛡️ **Admin**: Gestión avanzada de tareas.
-    *   👷 **Colaborador**: Creación y ejecución de tareas.
-*   🖼️ **Foto de Perfil**: Los usuarios pueden subir una foto de perfil que se guarda localmente.
-*   🌗 **Tema Dinámico**: La interfaz se adapta al tema del dispositivo (Claro/Oscuro), cambiando automáticamente los logos y colores.
+### 1. 🔐 Autenticación y Seguridad
+*   **API Integration**: Autenticación segura contra backend (`/auth/login`, `/auth/register`).
+*   **Persistencia de Sesión**: El token de autenticación se guarda localmente para mantener la sesión activa.
+*   **Manejo de Errores**: Feedback visual en caso de credenciales incorrectas o problemas de conexión.
 
-### 2. 📋 Gestión de Tareas
-*   ✏️ **CRUD Completo**: Crear, Leer, Actualizar y Eliminar tareas.
-*   👤 **Asignación**: Los administradores pueden asignar tareas a usuarios específicos.
-*   🔒 **Restricciones de Edición**: Si un Superadmin asigna una tarea a un Admin, este último solo puede agregar notas y fotos de término, sin modificar los detalles principales.
-*   📷 **Evidencia Fotográfica**:
-    *   **Foto Principal**: Al crear la tarea.
-    *   **Foto de Término**: Al finalizar la tarea.
-*   📝 **Notas de Ejecución**: Campo de texto libre para bitácora de la tarea.
-*   📍 **Ubicación**: Integración con mapas para visualizar la ubicación de la tarea.
+### 2. 📋 Gestión de Tareas (API)
+*   ✏️ **CRUD Completo**: Las tareas se crean, leen, actualizan y eliminan directamente en el servidor.
+*   ☁️ **Sincronización**: Los datos están centralizados en la nube, permitiendo acceso desde múltiples dispositivos.
+*   � **Ubicación Real**: Al crear una tarea, se captura automáticamente la latitud y longitud del dispositivo.
+*   � **Imágenes**: Soporte para visualizar imágenes asociadas a las tareas (vía URL).
+*   � **Actualización en Tiempo Real**: "Pull-to-refresh" para actualizar la lista de tareas desde el servidor.
 
-### 3. ⚙️ Panel de Administración
-*   👥 Visualización de lista de usuarios.
-*   ⬆️⬇️ Gestión de roles (Ascender/Degradar).
-*   👁️ Visualización de fotos de perfil de otros usuarios (solo Superadmin).
+### 3. ⚙️ Configuración y Entorno
+*   **Variables de Entorno**: Configuración flexible de la URL de la API mediante `.env`.
+*   **Modo Debug**: Herramientas en pantalla de login para probar conectividad con el servidor.
+
+### 4. 📡 Documentación de la API
+
+La aplicación se comunica con una API RESTful para la gestión de datos. A continuación se detallan los endpoints principales utilizados:
+
+#### 🔐 Autenticación (`/auth`)
+*   `POST /auth/register`: Registra un nuevo usuario.
+    *   **Body**: `{ email, password }`
+    *   **Respuesta**: Token JWT y objeto de usuario.
+*   `POST /auth/login`: Inicia sesión con credenciales existentes.
+    *   **Body**: `{ email, password }`
+    *   **Respuesta**: Token JWT y objeto de usuario.
+
+#### 📝 Tareas (`/todos`)
+*   `GET /todos`: Obtiene la lista de tareas del usuario autenticado.
+    *   **Headers**: `Authorization: Bearer <token>`
+*   `POST /todos`: Crea una nueva tarea.
+    *   **Body**: `{ title, location: { latitude, longitude }, photoUri? }`
+*   `PATCH /todos/:id`: Actualiza una tarea existente (ej. marcar como completada).
+    *   **Body**: `{ completed, title, ... }`
+*   `DELETE /todos/:id`: Elimina una tarea permanentemente.
 
 ## 📦 Instalación y Ejecución
 
 1.  **Clonar el repositorio** o descomprimir el archivo del proyecto.
 
-2.  **Instalar dependencias**:
+2.  **Configurar Variables de Entorno**:
+    Crear un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+    ```env
+    EXPO_PUBLIC_API_URL=https://basic-hono-api.borisbelmarm.workers.dev
+    ```
+
+3.  **Instalar dependencias**:
     ```bash
     npm install
     ```
 
-3.  **Iniciar la aplicación**:
+4.  **Iniciar la aplicación**:
     ```bash
-    npx expo start
+    npx expo start --clear
     ```
 
     > ⚠️ **Nota Importante**: Si tienes problemas de conexión o estás intentando abrir la app desde una red diferente a la de tu computador (por ejemplo, usando datos móviles), utiliza el modo túnel:
     > ```bash
     > npx expo start --tunnel
     > ```
-    > *Es posible que necesites instalar `ngrok` globalmente si se solicita.*
 
 ## 🔑 Credenciales de Prueba
 
-*   👑 **Superadmin**: `citonova.admin@citonova.com` / `1234`
-*   🛡️ **Admin**: `admin@citonova.com` / `1234`
-*   🆕 **Nuevo Usuario**: Puedes registrarte libremente desde la pantalla de login.
+Puedes registrar un nuevo usuario directamente desde la aplicación o usar credenciales existentes si ya has creado una cuenta.
 
 ## 👥 Equipo de Desarrollo
 
 *   💻 **Benedykt Saravia**: Estructuración y detalles frontend.
 *   🧪 **Mariano Hurtado**: Implementación y pruebas de aplicación.
-*   💾 **Iñaky Segovia**: Implementación de AsyncStorage.
+*   💾 **Iñaky Segovia**: Implementación de AsyncStorage y API.
 
 ### 🤖 Uso de Inteligencia Artificial
 Para el desarrollo de este proyecto se utilizó Inteligencia Artificial como herramienta de apoyo en organización, documentación y optimización de código.

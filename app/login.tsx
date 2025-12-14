@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../services/api';
 import { Colors } from '../constants/Colors';
 import { useColorScheme } from '../components/useColorScheme';
 
@@ -9,31 +10,41 @@ export default function LoginScreen() {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { login, register } = useAuth();
+    const { login, register, isLoading } = useAuth();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!email || !password) {
             Alert.alert('Error', 'Por favor ingrese email y contraseña');
             return;
         }
 
         if (isLogin) {
-            const success = login(email, password);
-            if (success) {
+            const result = await login(email, password);
+            if (result.success) {
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Error', 'Credenciales incorrectas');
+                Alert.alert('Error', result.error || 'Credenciales incorrectas o error de conexión');
             }
         } else {
-            const success = register(email, password);
-            if (success) {
+            const result = await register(email, password);
+            if (result.success) {
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Error', 'El usuario ya existe');
+                Alert.alert('Error', result.error || 'El usuario ya existe o error de conexión');
             }
+        }
+    };
+
+    const testConnectivity = async () => {
+        try {
+            Alert.alert('Probando conexión', `Intentando conectar a ${API_URL}...`);
+            const response = await fetch(`${API_URL}/docs`, { method: 'HEAD' });
+            Alert.alert('Éxito', `Conexión exitosa: ${response.status}`);
+        } catch (error: any) {
+            Alert.alert('Error de conexión', `No se pudo conectar: ${error.message}`);
         }
     };
 
@@ -77,8 +88,16 @@ export default function LoginScreen() {
                         secureTextEntry
                     />
 
-                    <TouchableOpacity style={[styles.button, { backgroundColor: theme.primary }]} onPress={handleSubmit}>
-                        <Text style={styles.buttonText}>{isLogin ? 'Entrar' : 'Registrarse'}</Text>
+                    <TouchableOpacity
+                        style={[styles.button, { backgroundColor: theme.primary, opacity: isLoading ? 0.7 : 1 }]}
+                        onPress={handleSubmit}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator color="white" />
+                        ) : (
+                            <Text style={styles.buttonText}>{isLogin ? 'Entrar' : 'Registrarse'}</Text>
+                        )}
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.switchButton} onPress={() => setIsLogin(!isLogin)}>
@@ -86,6 +105,13 @@ export default function LoginScreen() {
                             {isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
                         </Text>
                     </TouchableOpacity>
+
+                    <View style={{ marginTop: 30, alignItems: 'center' }}>
+                        <Text style={{ color: theme.secondary, fontSize: 10 }}>API: {API_URL}</Text>
+                        <TouchableOpacity onPress={testConnectivity} style={{ marginTop: 10, padding: 5 }}>
+                            <Text style={{ color: theme.primary, fontSize: 12 }}>Probar Conexión</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
