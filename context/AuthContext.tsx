@@ -1,26 +1,21 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../services/api';
 
 export type UserRole = 'superadmin' | 'admin' | 'collaborator';
 
 export interface User {
     email: string;
-    password: string;
     role: UserRole;
-    requestedAdmin?: boolean;
-    profileImageUri?: string;
+    id: string;
 }
 
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    allUsers: User[];
-    login: (email: string, password: string) => boolean;
-    register: (email: string, password: string) => boolean;
+    login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
-    requestAdminAccess: () => void;
-    updateUserRole: (email: string, newRole: UserRole) => void;
-    updateProfileImage: (email: string, uri: string) => void;
     isLoading: boolean;
 }
 
@@ -28,123 +23,113 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [users, setUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     useEffect(() => {
-        loadUsers();
+        checkAuth();
     }, []);
 
-    const loadUsers = async () => {
+    const checkAuth = async () => {
         try {
-            const storedUsers = await AsyncStorage.getItem('users');
-            if (storedUsers) {
-                setUsers(JSON.parse(storedUsers));
-            } else {
-                // Initial default users
-                const defaultUsers: User[] = [
-                    { email: 'citonova.admin@citonova.com', password: '1234', role: 'superadmin' },
-                    { email: 'admin@citonova.com', password: '1234', role: 'admin' }
-                ];
-                setUsers(defaultUsers);
-                await AsyncStorage.setItem('users', JSON.stringify(defaultUsers));
+            const token = await AsyncStorage.getItem('token');
+            const userId = await AsyncStorage.getItem('userId');
+            const userEmail = await AsyncStorage.getItem('userEmail');
+
+            if (token && userId && userEmail) {
+                // In a real app we might want to validate the token with an endpoint like /auth/me
+                // For now we assume if token exists it's valid or will fail on first request
+                setUser({
+                    email: userEmail,
+                    id: userId,
+                    role: 'collaborator' // Default role as API doesn't seem to return role in login response
+                });
             }
         } catch (error) {
-            console.error('Failed to load users', error);
+            console.error('Failed to check auth', error);
+        } finally {
+            setIsInitialized(true);
+        }
+    };
+
+    const login = async (email: string, password: string) => {
+        setIsLoading(true);
+        try {
+            const response = await api.auth.login(email, password);
+            if (response.success && 'data' in response) {
+                const { token, user } = response.data;
+                const userId = user.id;
+
+                await AsyncStorage.setItem('token', token);
+                await AsyncStorage.setItem('userId', userId);
+                await AsyncStorage.setItem('userEmail', email);
+
+                setUser({
+                    email,
+                    id: userId,
+                    role: 'collaborator'
+                });
+                return { success: true };
+            }
+            return { success: false, error: 'error' in response ? response.error : 'Error desconocido' };
+        } catch (error) {
+            console.error('Login error', error);
+            return { success: false, error: 'Error de red' };
         } finally {
             setIsLoading(false);
         }
     };
 
-    const saveUsers = async (newUsers: User[]) => {
+    const register = async (email: string, password: string) => {
+        setIsLoading(true);
         try {
-            await AsyncStorage.setItem('users', JSON.stringify(newUsers));
+            const response = await api.auth.register(email, password);
+            if (response.success && 'data' in response) {
+                const { token, user } = response.data;
+                const userId = user.id;
+
+                await AsyncStorage.setItem('token', token);
+                await AsyncStorage.setItem('userId', userId);
+                await AsyncStorage.setItem('userEmail', email);
+
+                setUser({
+                    email,
+                    id: userId,
+                    role: 'collaborator'
+                });
+                return { success: true };
+            }
+            return { success: false, error: 'error' in response ? response.error : 'Error desconocido' };
         } catch (error) {
-            console.error('Failed to save users', error);
+            console.error('Register error', error);
+            return { success: false, error: 'Error de red' };
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const login = (email: string, password: string) => {
-        const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-        if (foundUser) {
-            setUser(foundUser);
-            return true;
-        }
-        return false;
-    };
-
-    const register = (email: string, password: string) => {
-        if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-            return false;
-        }
-        const newUser: User = { email, password, role: 'collaborator' };
-        const updatedUsers = [...users, newUser];
-        setUsers(updatedUsers);
-        saveUsers(updatedUsers);
-        setUser(newUser);
-        return true;
-    };
-
-    const logout = () => {
-        setUser(null);
-    };
-
-    const requestAdminAccess = () => {
-        if (user) {
-            const updatedUser = { ...user, requestedAdmin: true };
-            setUser(updatedUser);
-            const updatedUsers = users.map(u => u.email === user.email ? updatedUser : u);
-            setUsers(updatedUsers);
-            saveUsers(updatedUsers);
+    const logout = async () => {
+        try {
+            await AsyncStorage.removeItem('token');
+            await AsyncStorage.removeItem('userId');
+            await AsyncStorage.removeItem('userEmail');
+            setUser(null);
+        } catch (error) {
+            console.error('Logout error', error);
         }
     };
 
-    const updateUserRole = (email: string, newRole: UserRole) => {
-        const updatedUsers = users.map(u => {
-            if (u.email === email) {
-                return { ...u, role: newRole, requestedAdmin: false }; // Clear request on update
-            }
-            return u;
-        });
-        setUsers(updatedUsers);
-        saveUsers(updatedUsers);
-
-        // Update current user if it's the one being modified (though unlikely for role change by self)
-        if (user && user.email === email) {
-            setUser({ ...user, role: newRole, requestedAdmin: false });
-        }
-    };
-
-    const updateProfileImage = (email: string, uri: string) => {
-        const updatedUsers = users.map(u => {
-            if (u.email === email) {
-                return { ...u, profileImageUri: uri };
-            }
-            return u;
-        });
-        setUsers(updatedUsers);
-        saveUsers(updatedUsers);
-
-        if (user && user.email === email) {
-            setUser({ ...user, profileImageUri: uri });
-        }
-    };
-
-    if (isLoading) {
-        return null; // Or a loading spinner
+    if (!isInitialized) {
+        return null; // Or a loading spinner for initial app load
     }
 
     return (
         <AuthContext.Provider value={{
             user,
             isAuthenticated: !!user,
-            allUsers: users,
             login,
             register,
             logout,
-            requestAdminAccess,
-            updateUserRole,
-            updateProfileImage,
             isLoading
         }}>
             {children}
