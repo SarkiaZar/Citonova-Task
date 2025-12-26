@@ -140,7 +140,7 @@ export const api = {
                 return { success: false, error: 'Network error or timeout' };
             }
         },
-        delete: async (id: string): Promise<{ success: boolean; message?: string; error?: string }> => {
+    delete: async (id: string): Promise<{ success: boolean; message?: string; error?: string }> => {
             try {
                 const headers = await getHeaders();
                 const response = await fetchWithTimeout(`${API_URL}/todos/${id}`, {
@@ -153,4 +153,42 @@ export const api = {
             }
         },
     },
+    images: {
+        upload: async (uri: string): Promise<{ success: boolean; data?: string; error?: string }> => {
+            try {
+                const token = await AsyncStorage.getItem('token');
+                const formData = new FormData();
+                
+                // Get filename from URI
+                const filename = uri.split('/').pop() || 'image.jpg';
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+                // @ts-ignore
+                formData.append('file', { uri, name: filename, type });
+
+                const response = await fetchWithTimeout(`${API_URL}/images`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : '',
+                        // Content-Type is set automatically by fetch when using FormData
+                    },
+                    body: formData,
+                });
+
+                const result = await response.json();
+                
+                if (result.success && result.url) {
+                    return { success: true, data: result.url };
+                } else if (result.success && result.data && result.data.url) {
+                     return { success: true, data: result.data.url };
+                }
+                 
+                return { success: false, error: result.error || 'Failed to upload image' };
+            } catch (error) {
+                console.error('Upload error', error);
+                return { success: false, error: 'Network error during upload' };
+            }
+        }
+    }
 };

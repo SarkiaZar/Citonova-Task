@@ -52,6 +52,19 @@ La aplicación se comunica con una API RESTful para la gestión de datos. A cont
     *   **Body**: `{ completed, title, ... }`
 *   `DELETE /todos/:id`: Elimina una tarea permanentemente.
 
+#### 📸 Imágenes (`/images`)
+*   `POST /images`: Sube una imagen al servidor.
+    *   **Headers**: `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
+    *   **Body**: FormData con campo `file`.
+    *   **Respuesta**: URL de la imagen subida (`{ success: true, url: string }`).
+
+### 5. 🧩 Arquitectura y Hooks
+
+Para mantener una separación clara de responsabilidades, la lógica de negocio se ha desacoplado de la vista mediante Custom Hooks y Context API:
+
+*   **`TaskContext` / `useTasks`**: Centraliza el estado global de las tareas y las operaciones CRUD, gestionando la sincronización con la API y el manejo de errores/loading.
+*   **`useImageUpload`**: Hook específico para encapsular la lógica de subida de imágenes, proporcionando estados de `uploading`, `error` y la función de subida.
+
 ## 📦 Instalación y Ejecución
 
 1.  **Clonar el repositorio** o descomprimir el archivo del proyecto.

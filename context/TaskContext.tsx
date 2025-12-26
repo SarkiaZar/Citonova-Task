@@ -1,6 +1,7 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { useAuth } from './AuthContext';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { useImageUpload } from '../hooks/useImageUpload';
 import { api, Task as ApiTask } from '../services/api';
+import { useAuth } from './AuthContext';
 
 export interface Task extends ApiTask {
     // Add any local-only fields if necessary, or just alias ApiTask
@@ -30,7 +31,9 @@ const TaskContext = createContext<TaskContextType | undefined>(undefined);
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+
     const { user } = useAuth();
+    const { uploadImage } = useImageUpload();
 
     useEffect(() => {
         if (user) {
@@ -58,7 +61,19 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     const addTask = async (title: string, location: { latitude: number; longitude: number }, photoUri?: string) => {
         setIsLoading(true);
         try {
-            const response = await api.todos.create(title, location, photoUri);
+            let remotePhotoUrl = undefined;
+            if (photoUri) {
+                const uploadResult = await uploadImage(photoUri);
+                if (uploadResult.success) {
+                    remotePhotoUrl = uploadResult.url;
+                } else {
+                    console.error('Failed to upload image', uploadResult.error);
+                    // Decide if we should continue without image or stop.
+                    // For now, let's continue but maybe alert/log
+                }
+            }
+
+            const response = await api.todos.create(title, location, remotePhotoUrl);
             if (response.success && 'data' in response) {
                 setTasks(prev => [...prev, response.data]);
             }
@@ -70,12 +85,25 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const updateTask = async (id: string, updates: Partial<Task>) => {
-        // Optimistic update
+        // Optimistic update (be careful with photos - might be temporary local, then remote)
+        // If updates has photoUri, we might need to upload it first if it's new.
+        // Assuming current simple UI sends new photo URI when changed.
+
+        let finalUpdates = { ...updates };
+
+        if (updates.photoUri && !updates.photoUri.startsWith('http')) {
+            // It's a local URI, needs upload
+            const uploadResult = await uploadImage(updates.photoUri);
+            if (uploadResult.success) {
+                finalUpdates.photoUri = uploadResult.url;
+            }
+        }
+
         const oldTasks = [...tasks];
-        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...finalUpdates } : t));
 
         try {
-            const response = await api.todos.update(id, updates);
+            const response = await api.todos.update(id, finalUpdates);
             if (!response.success) {
                 // Revert if failed
                 setTasks(oldTasks);
