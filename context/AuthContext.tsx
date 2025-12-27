@@ -1,5 +1,5 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { api } from '../services/api';
 
 export type UserRole = 'superadmin' | 'admin' | 'collaborator';
@@ -52,6 +52,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const getErrorMessage = (error: any): string => {
+        if (typeof error === 'string') return error;
+        if (typeof error === 'object' && error !== null) {
+            // Si el objeto tiene una propiedad 'message' o 'error', úsala
+            if (error.message) return String(error.message);
+            if (error.error) return String(error.error);
+            return JSON.stringify(error);
+        }
+        return String(error || 'Error desconocido');
+    };
+
     const login = async (email: string, password: string) => {
         setIsLoading(true);
         try {
@@ -71,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 });
                 return { success: true };
             }
-            return { success: false, error: 'error' in response ? response.error : 'Error desconocido' };
+            return { success: false, error: getErrorMessage('error' in response ? response.error : 'Error desconocido') };
         } catch (error) {
             console.error('Login error', error);
             return { success: false, error: 'Error de red' };
@@ -99,7 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 });
                 return { success: true };
             }
-            return { success: false, error: 'error' in response ? response.error : 'Error desconocido' };
+            return { success: false, error: getErrorMessage('error' in response ? response.error : 'Error desconocido') };
         } catch (error) {
             console.error('Register error', error);
             return { success: false, error: 'Error de red' };

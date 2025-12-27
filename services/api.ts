@@ -140,7 +140,7 @@ export const api = {
                 return { success: false, error: 'Network error or timeout' };
             }
         },
-    delete: async (id: string): Promise<{ success: boolean; message?: string; error?: string }> => {
+        delete: async (id: string): Promise<{ success: boolean; message?: string; error?: string }> => {
             try {
                 const headers = await getHeaders();
                 const response = await fetchWithTimeout(`${API_URL}/todos/${id}`, {
@@ -158,14 +158,14 @@ export const api = {
             try {
                 const token = await AsyncStorage.getItem('token');
                 const formData = new FormData();
-                
+
                 // Get filename from URI
                 const filename = uri.split('/').pop() || 'image.jpg';
                 const match = /\.(\w+)$/.exec(filename);
                 const type = match ? `image/${match[1]}` : 'image/jpeg';
 
                 // @ts-ignore
-                formData.append('file', { uri, name: filename, type });
+                formData.append('image', { uri, name: filename, type });
 
                 const response = await fetchWithTimeout(`${API_URL}/images`, {
                     method: 'POST',
@@ -177,13 +177,22 @@ export const api = {
                 });
 
                 const result = await response.json();
-                
+
+                let imageUrl = '';
                 if (result.success && result.url) {
-                    return { success: true, data: result.url };
+                    imageUrl = result.url;
                 } else if (result.success && result.data && result.data.url) {
-                     return { success: true, data: result.data.url };
+                    imageUrl = result.data.url;
                 }
-                 
+
+                if (imageUrl) {
+                    // Ensure the URL is absolute
+                    if (imageUrl.startsWith('/')) {
+                        imageUrl = `${API_URL}${imageUrl}`;
+                    }
+                    return { success: true, data: imageUrl };
+                }
+
                 return { success: false, error: result.error || 'Failed to upload image' };
             } catch (error) {
                 console.error('Upload error', error);
